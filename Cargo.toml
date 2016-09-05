@@ -1,0 +1,12 @@
+[package]
+name = "stscli"
+version = "0.1.0"
+authors = ["Chris Dawes <cmsd2@cantab.net>"]
+
+[dependencies]
+#rusoto = { git = "https://github.com/cmsd2/rusoto", rev = "74505d6bfc9752c5957da234693276768c7e81e1", features = ["sts"] }
+rusoto = { path = "../rusoto", features = ["sts"] }
+clap = "2.11.0"
+quick-error = "1.1.0"
+log = "0.3.6"
+env_logger = "0.3.4"
