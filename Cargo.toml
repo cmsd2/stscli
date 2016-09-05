@@ -2,6 +2,7 @@
 name = "stscli"
 version = "0.1.0"
 authors = ["Chris Dawes <cmsd2@cantab.net>"]
+license = "Apache-2.0"
 
 [dependencies]
 rusoto = { git = "https://github.com/cmsd2/rusoto", rev = "52c5c98ee4ec13ec9d307e3ab80d7187c90ad4f7", features = ["sts"] }
