@@ -212,6 +212,10 @@ fn get_token(_matches: &ArgMatches, config: &Config) -> Result<()> {
         println!("AWS_SECURITY_TOKEN={}", token);
     }
 
+    if let Some(region) = config.region {
+        println!("AWS_DEFAULT_REGION={}", region);
+    }
+
     Ok(())
 }
 
@@ -232,6 +236,10 @@ fn exec_command(args: &ArgMatches, config: &Config) -> Result<()> {
     if let Some(ref session_token) = *creds.token() {
         env.insert("AWS_SESSION_TOKEN".to_owned(), session_token.to_owned());
         env.insert("AWS_SECURITY_TOKEN".to_owned(), session_token.to_owned());
+    }
+
+    if let Some(region) = config.region {
+        env.insert("AWS_DEFAULT_REGION".to_owned(), region.to_string());
     }
 
     spawn_command(OsString::from(command_name).as_os_str(), &args[..], &env)
