@@ -55,6 +55,7 @@ quick_error! {
 
 pub type Result<T> = result::Result<T, StsCliError>;
 
+#[derive(Debug, Clone)]
 pub struct Config {
     config_file: Option<PathBuf>,
     credentials_file: Option<PathBuf>,
@@ -160,6 +161,7 @@ pub fn main() {
 
 fn run_subcommand(matches: &ArgMatches) -> Result<()> {
     let config = try!(Config::new_for_matches(matches));
+    debug!("config: {:?}", config);
 
     match matches.subcommand() {
         ("get", Some(sub_matches)) => get_token(sub_matches, &config),
@@ -177,6 +179,10 @@ fn get_credentials(config: &Config) -> Result<rusoto::AwsCredentials> {
 
     if let Some(ref credentials_file_name) = config.credentials_file {
         profile_provider.set_file_path(credentials_file_name);
+    }
+
+    if let Some(ref profile) = config.profile {
+        profile_provider.set_profile(&profile[..]);
     }
 
     let base_provider = ChainProvider::with_profile_provider(profile_provider);
@@ -203,6 +209,7 @@ fn get_token(_matches: &ArgMatches, config: &Config) -> Result<()> {
 
     if let Some(ref token) = *creds.token() {
         println!("AWS_SESSION_TOKEN={}", token);
+        println!("AWS_SECURITY_TOKEN={}", token);
     }
 
     Ok(())
@@ -224,6 +231,7 @@ fn exec_command(args: &ArgMatches, config: &Config) -> Result<()> {
 
     if let Some(ref session_token) = *creds.token() {
         env.insert("AWS_SESSION_TOKEN".to_owned(), session_token.to_owned());
+        env.insert("AWS_SECURITY_TOKEN".to_owned(), session_token.to_owned());
     }
 
     spawn_command(OsString::from(command_name).as_os_str(), &args[..], &env)
