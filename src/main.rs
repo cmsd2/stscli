@@ -5,6 +5,8 @@ extern crate quick_error;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
+extern crate rustc_serialize;
+extern crate regex;
 
 use clap::{Arg, ArgMatches, App, SubCommand};
 use std::{result};
@@ -15,6 +17,8 @@ use std::path::PathBuf;
 use std::collections::HashMap;
 use std::process;
 use std::ffi::{OsStr, OsString};
+use regex::Regex;
+use rustc_serialize::json;
 use rusoto::*;
 
 quick_error! {
@@ -50,10 +54,25 @@ quick_error! {
             description("child exited")
             display("child exited: {}", code)
         }
+
+        JsonEncoderError(err: json::EncoderError) {
+            from()
+            description("json encoder error")
+            display("Json encoder error: {}", err)
+            cause(err)
+        }
     }
 }
 
 pub type Result<T> = result::Result<T, StsCliError>;
+
+#[derive(Copy, Clone, Debug)]
+pub enum OutputFormat {
+    Bash { export: bool },
+    Fish { export: bool },
+    Powershell { export: bool },
+    Json
+}
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -62,7 +81,7 @@ pub struct Config {
     profile: Option<String>,
     role: Option<String>,
     region: Option<rusoto::Region>,
-    name: Option<String>
+    name: Option<String>,
 }
 
 impl Config {
@@ -135,6 +154,20 @@ pub fn main() {
             .about("get some fresh session tokens and display them")
             .version("1.0")
             .author("various")
+            .arg(Arg::with_name("export")
+                .long("export")
+                .short("e")
+                .required(false)
+                .takes_value(false)
+                .help("print the variables for exporting to a shell")
+                )
+            .arg(Arg::with_name("format")
+                .long("format")
+                .short("f")
+                .required(false)
+                .takes_value(true)
+                .help("format to use when printing the variables. one of json, bash, fish or powershell. default bash")
+                )
             )
         .subcommand(SubCommand::with_name("exec")
             .about("runs a command with session tokens injected into the environment")
@@ -201,33 +234,46 @@ fn get_credentials(config: &Config) -> Result<rusoto::AwsCredentials> {
     provider.credentials().map_err(StsCliError::from)
 }
 
-fn get_token(_matches: &ArgMatches, config: &Config) -> Result<()> {
+fn get_output_format(args: &ArgMatches) -> OutputFormat {
+    let export = args.is_present("export");
+
+    match args.value_of("format") {
+        Some("json") => OutputFormat::Json,
+        Some("fish") => OutputFormat::Fish { export: export },
+        Some("powershell") => OutputFormat::Powershell { export: export },
+        _ => OutputFormat::Bash { export: export }
+    }
+}
+
+fn get_token(args: &ArgMatches, config: &Config) -> Result<()> {
     let creds = try!(get_credentials(config));
+    let output_format = get_output_format(args);
 
-    println!("AWS_ACCESS_KEY_ID={}", creds.aws_access_key_id());
-    println!("AWS_SECRET_ACCESS_KEY={}", creds.aws_secret_access_key());
+    let vars = try!(get_vars(args, config, &creds));
 
-    if let Some(ref token) = *creds.token() {
-        println!("AWS_SESSION_TOKEN={}", token);
-        println!("AWS_SECURITY_TOKEN={}", token);
-    }
-
-    if let Some(region) = config.region {
-        println!("AWS_DEFAULT_REGION={}", region);
-    }
+    match output_format {
+        OutputFormat::Json => { try!(print_vars_json(args, config, &vars)); },
+        format => { try!(print_vars(args, config, &vars, format)); }
+    };
 
     Ok(())
 }
 
-fn exec_command(args: &ArgMatches, config: &Config) -> Result<()> {
+fn exec_command(matches: &ArgMatches, config: &Config) -> Result<()> {
     let creds = try!(get_credentials(config));
 
-    let command_line: Vec<&str> = args.values_of("command").unwrap().collect();
+    let command_line: Vec<&str> = matches.values_of("command").unwrap().collect();
     
     let mut command_line_iter = command_line.into_iter();
     let command_name = command_line_iter.next().unwrap();
     let args: Vec<&str> = command_line_iter.collect();
 
+    let env = try!(get_vars(matches, config, &creds));
+
+    spawn_command(OsString::from(command_name).as_os_str(), &args[..], &env)
+}
+
+fn get_vars(_matches: &ArgMatches, config: &Config, creds: &rusoto::AwsCredentials) -> Result<HashMap<String, String>> {
     let mut env: HashMap<String, String> = HashMap::new();
 
     env.insert("AWS_ACCESS_KEY_ID".to_owned(), creds.aws_access_key_id().to_owned());
@@ -242,7 +288,38 @@ fn exec_command(args: &ArgMatches, config: &Config) -> Result<()> {
         env.insert("AWS_DEFAULT_REGION".to_owned(), region.to_string());
     }
 
-    spawn_command(OsString::from(command_name).as_os_str(), &args[..], &env)
+    Ok(env)
+}
+
+pub fn print_vars_json(_args: &ArgMatches, _config: &Config, vars: &HashMap<String, String>) -> Result<()> {
+    let vars_json = try!(json::encode(vars).map_err(StsCliError::from));
+
+    println!("{}", vars_json);
+
+    Ok(())
+}
+
+pub fn print_vars(_args: &ArgMatches, _config: &Config, vars: &HashMap<String, String>, output_format: OutputFormat) -> Result<()> {
+    for (k, v) in vars {
+        print_var(k, v, output_format);
+    }
+
+    Ok(())
+}
+
+pub fn print_var(k: &str, v: &str, output_format: OutputFormat) {
+    match output_format {
+        OutputFormat::Bash{export} => {
+            print_bash_var(k, v, export);
+        },
+        OutputFormat::Fish{export} => {
+            print_var_fish(k, v, export);
+        },
+        OutputFormat::Powershell{export} => {
+            print_var_ps(k, v, export);
+        },
+        _ => unreachable!()
+    };
 }
 
 pub fn spawn_command<S>(command_str: &OsStr, args: &[S], env: &HashMap<String, String>) -> Result<()> where S: AsRef<OsStr> {
@@ -267,4 +344,49 @@ pub fn spawn_command<S>(command_str: &OsStr, args: &[S], env: &HashMap<String, S
             }
         })
     }
+}
+
+fn print_bash_var(k: &str, v: &str, export_vars: bool) {
+    let re = shell_re();
+
+    let export_prefix = if export_vars { "export " } else { "" };
+
+    let escaped = re.replace_all(v, shell_esc());
+    println!("{}{}=\"{}\"", export_prefix, k, escaped);
+}
+
+fn print_var_fish(k: &str, v: &str, export_vars: bool) {
+    let re = shell_re();
+
+    let export_prefix = if export_vars { "set -x" } else { "set" };
+
+    let escaped = re.replace_all(v, shell_esc());
+    println!("{} {} \"{}\"", export_prefix, k, escaped);
+}
+
+fn print_var_ps(k: &str, v: &str, export_vars: bool) {
+    let re = powershell_re();
+
+    let export_prefix = if export_vars { "env:" } else { "" };
+
+    let escaped = re.replace_all(v, powershell_esc());
+    println!("${}{} = \"{}\"", export_prefix, k, escaped);
+}
+
+fn shell_re() -> Regex {
+    let pattern = r#"[\\"]"#;
+    Regex::new(pattern).unwrap()
+}
+
+fn shell_esc() -> &'static str {
+    "\\$0"
+}
+
+fn powershell_re() -> Regex {
+    let pattern = r#"[\0\r\n\t`"]"#;
+    Regex::new(pattern).unwrap()
+}
+
+fn powershell_esc() -> &'static str {
+    "`$0"
 }
