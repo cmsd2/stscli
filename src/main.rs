@@ -8,100 +8,18 @@ extern crate env_logger;
 extern crate rustc_serialize;
 extern crate regex;
 
+pub mod print;
+pub mod result;
+pub mod config;
+
 use clap::{Arg, ArgMatches, App, SubCommand};
-use std::{result};
-use std::io;
 use std::io::Write;
-use std::str::FromStr;
-use std::path::PathBuf;
 use std::collections::HashMap;
-use std::process;
-use std::ffi::{OsStr, OsString};
-use regex::Regex;
-use rustc_serialize::json;
+use std::ffi::OsString;
 use rusoto::*;
-
-quick_error! {
-    #[derive(Debug)]
-    pub enum StsCliError {
-        Io(err: io::Error) {
-            from()
-            description("io error")
-            display("I/O error: {}", err)
-            cause(err)
-        }
-
-        Credentials(err: rusoto::CredentialsError) {
-            from()
-            description("aws credentials error")
-            display("AWS Credentials error: {}", err)
-            cause(err)
-        }
-
-        Region(err: rusoto::ParseRegionError) {
-            from()
-            description("aws region error")
-            display("AWS Region parser error: {}", err)
-            cause(err)
-        }
-
-        ProcessKilled {
-            description("process killed")
-            display("process killed")
-        }
-
-        ChildExited(code: i32) {
-            description("child exited")
-            display("child exited: {}", code)
-        }
-
-        JsonEncoderError(err: json::EncoderError) {
-            from()
-            description("json encoder error")
-            display("Json encoder error: {}", err)
-            cause(err)
-        }
-    }
-}
-
-pub type Result<T> = result::Result<T, StsCliError>;
-
-#[derive(Copy, Clone, Debug)]
-pub enum OutputFormat {
-    Bash { export: bool },
-    Fish { export: bool },
-    Powershell { export: bool },
-    Json
-}
-
-#[derive(Debug, Clone)]
-pub struct Config {
-    config_file: Option<PathBuf>,
-    credentials_file: Option<PathBuf>,
-    profile: Option<String>,
-    role: Option<String>,
-    region: Option<rusoto::Region>,
-    name: Option<String>,
-}
-
-impl Config {
-    pub fn new_for_matches(args: &ArgMatches) -> Result<Config> {
-        let region = if let Some(region_name) = args.value_of("region") {
-            Some(try!(rusoto::Region::from_str(region_name)))
-        } else {
-            None
-        };
-
-        Ok(Config {
-            config_file: args.value_of("config_file").map(|s| PathBuf::from(s)),
-            credentials_file: args.value_of("credentials_file").map(|s| PathBuf::from(s)),
-            profile: args.value_of("profile").map(|s| s.to_owned()),
-            role: args.value_of("role").map(|s| s.to_owned()),
-            region: region,
-            name: args.value_of("name").map(|s| s.to_owned()),
-        })
-    }
-}
+use print::*;
+use result::*;
+use config::*;
 
 pub fn main() {
     env_logger::init().unwrap();
@@ -291,102 +209,3 @@ fn get_vars(_matches: &ArgMatches, config: &Config, creds: &rusoto::AwsCredentia
     Ok(env)
 }
 
-pub fn print_vars_json(_args: &ArgMatches, _config: &Config, vars: &HashMap<String, String>) -> Result<()> {
-    let vars_json = try!(json::encode(vars).map_err(StsCliError::from));
-
-    println!("{}", vars_json);
-
-    Ok(())
-}
-
-pub fn print_vars(_args: &ArgMatches, _config: &Config, vars: &HashMap<String, String>, output_format: OutputFormat) -> Result<()> {
-    for (k, v) in vars {
-        print_var(k, v, output_format);
-    }
-
-    Ok(())
-}
-
-pub fn print_var(k: &str, v: &str, output_format: OutputFormat) {
-    match output_format {
-        OutputFormat::Bash{export} => {
-            print_bash_var(k, v, export);
-        },
-        OutputFormat::Fish{export} => {
-            print_var_fish(k, v, export);
-        },
-        OutputFormat::Powershell{export} => {
-            print_var_ps(k, v, export);
-        },
-        _ => unreachable!()
-    };
-}
-
-pub fn spawn_command<S>(command_str: &OsStr, args: &[S], env: &HashMap<String, String>) -> Result<()> where S: AsRef<OsStr> {
-        
-    let mut command = process::Command::new(command_str);
-    command.args(&args);
-
-    for (k,v) in env {
-        command.env(k, v);
-    }
-
-    {
-        let mut result = try!(command.spawn());
-        
-        let status = try!(result.wait());
-        
-        status.code().ok_or(StsCliError::ProcessKilled).and_then(|code| {
-            if code == 0 {
-                Ok(())
-            } else {
-                Err(StsCliError::ChildExited(code))
-            }
-        })
-    }
-}
-
-fn print_bash_var(k: &str, v: &str, export_vars: bool) {
-    let re = shell_re();
-
-    let export_prefix = if export_vars { "export " } else { "" };
-
-    let escaped = re.replace_all(v, shell_esc());
-    println!("{}{}=\"{}\"", export_prefix, k, escaped);
-}
-
-fn print_var_fish(k: &str, v: &str, export_vars: bool) {
-    let re = shell_re();
-
-    let export_prefix = if export_vars { "set -x" } else { "set" };
-
-    let escaped = re.replace_all(v, shell_esc());
-    println!("{} {} \"{}\"", export_prefix, k, escaped);
-}
-
-fn print_var_ps(k: &str, v: &str, export_vars: bool) {
-    let re = powershell_re();
-
-    let export_prefix = if export_vars { "env:" } else { "" };
-
-    let escaped = re.replace_all(v, powershell_esc());
-    println!("${}{} = \"{}\"", export_prefix, k, escaped);
-}
-
-fn shell_re() -> Regex {
-    let pattern = r#"[\\"]"#;
-    Regex::new(pattern).unwrap()
-}
-
-fn shell_esc() -> &'static str {
-    "\\$0"
-}
-
-fn powershell_re() -> Regex {
-    let pattern = r#"[\0\r\n\t`"]"#;
-    Regex::new(pattern).unwrap()
-}
-
-fn powershell_esc() -> &'static str {
-    "`$0"
-}
