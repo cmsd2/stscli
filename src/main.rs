@@ -110,7 +110,7 @@ pub fn main() {
 
     let matches = App::new("rusoto-sts")
         .version("1.0")
-        .author("various")
+        .author("Chris Dawes <cmsd2@cantab.net>")
         .about("Acquire session tokens from Amazon STS")
         .arg(Arg::with_name("config")
             .short("c")
