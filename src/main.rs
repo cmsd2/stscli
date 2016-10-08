@@ -5,84 +5,21 @@ extern crate quick_error;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
+extern crate rustc_serialize;
+extern crate regex;
+
+pub mod print;
+pub mod result;
+pub mod config;
 
 use clap::{Arg, ArgMatches, App, SubCommand};
-use std::{result};
-use std::io;
 use std::io::Write;
-use std::str::FromStr;
-use std::path::PathBuf;
 use std::collections::HashMap;
-use std::process;
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsString;
 use rusoto::*;
-
-quick_error! {
-    #[derive(Debug)]
-    pub enum StsCliError {
-        Io(err: io::Error) {
-            from()
-            description("io error")
-            display("I/O error: {}", err)
-            cause(err)
-        }
-
-        Credentials(err: rusoto::CredentialsError) {
-            from()
-            description("aws credentials error")
-            display("AWS Credentials error: {}", err)
-            cause(err)
-        }
-
-        Region(err: rusoto::ParseRegionError) {
-            from()
-            description("aws region error")
-            display("AWS Region parser error: {}", err)
-            cause(err)
-        }
-
-        ProcessKilled {
-            description("process killed")
-            display("process killed")
-        }
-
-        ChildExited(code: i32) {
-            description("child exited")
-            display("child exited: {}", code)
-        }
-    }
-}
-
-pub type Result<T> = result::Result<T, StsCliError>;
-
-#[derive(Debug, Clone)]
-pub struct Config {
-    config_file: Option<PathBuf>,
-    credentials_file: Option<PathBuf>,
-    profile: Option<String>,
-    role: Option<String>,
-    region: Option<rusoto::Region>,
-    name: Option<String>
-}
-
-impl Config {
-    pub fn new_for_matches(args: &ArgMatches) -> Result<Config> {
-        let region = if let Some(region_name) = args.value_of("region") {
-            Some(try!(rusoto::Region::from_str(region_name)))
-        } else {
-            None
-        };
-
-        Ok(Config {
-            config_file: args.value_of("config_file").map(|s| PathBuf::from(s)),
-            credentials_file: args.value_of("credentials_file").map(|s| PathBuf::from(s)),
-            profile: args.value_of("profile").map(|s| s.to_owned()),
-            role: args.value_of("role").map(|s| s.to_owned()),
-            region: region,
-            name: args.value_of("name").map(|s| s.to_owned()),
-        })
-    }
-}
+use print::*;
+use result::*;
+use config::*;
 
 pub fn main() {
     env_logger::init().unwrap();
@@ -91,7 +28,7 @@ pub fn main() {
 
     let matches = App::new("rusoto-sts")
         .version("1.0")
-        .author("various")
+        .author("Chris Dawes <cmsd2@cantab.net>")
         .about("Acquire session tokens from Amazon STS")
         .arg(Arg::with_name("config")
             .short("c")
@@ -135,6 +72,20 @@ pub fn main() {
             .about("get some fresh session tokens and display them")
             .version("1.0")
             .author("various")
+            .arg(Arg::with_name("export")
+                .long("export")
+                .short("e")
+                .required(false)
+                .takes_value(false)
+                .help("print the variables for exporting to a shell")
+                )
+            .arg(Arg::with_name("format")
+                .long("format")
+                .short("f")
+                .required(false)
+                .takes_value(true)
+                .help("format to use when printing the variables. one of json, bash, fish or powershell. default bash")
+                )
             )
         .subcommand(SubCommand::with_name("exec")
             .about("runs a command with session tokens injected into the environment")
@@ -201,33 +152,46 @@ fn get_credentials(config: &Config) -> Result<rusoto::AwsCredentials> {
     provider.credentials().map_err(StsCliError::from)
 }
 
-fn get_token(_matches: &ArgMatches, config: &Config) -> Result<()> {
+fn get_output_format(args: &ArgMatches) -> OutputFormat {
+    let export = args.is_present("export");
+
+    match args.value_of("format") {
+        Some("json") => OutputFormat::Json,
+        Some("fish") => OutputFormat::Fish { export: export },
+        Some("powershell") => OutputFormat::Powershell { export: export },
+        _ => OutputFormat::Bash { export: export }
+    }
+}
+
+fn get_token(args: &ArgMatches, config: &Config) -> Result<()> {
     let creds = try!(get_credentials(config));
+    let output_format = get_output_format(args);
 
-    println!("AWS_ACCESS_KEY_ID={}", creds.aws_access_key_id());
-    println!("AWS_SECRET_ACCESS_KEY={}", creds.aws_secret_access_key());
+    let vars = try!(get_vars(args, config, &creds));
 
-    if let Some(ref token) = *creds.token() {
-        println!("AWS_SESSION_TOKEN={}", token);
-        println!("AWS_SECURITY_TOKEN={}", token);
-    }
-
-    if let Some(region) = config.region {
-        println!("AWS_DEFAULT_REGION={}", region);
-    }
+    match output_format {
+        OutputFormat::Json => { try!(print_vars_json(args, config, &vars)); },
+        format => { try!(print_vars(args, config, &vars, format)); }
+    };
 
     Ok(())
 }
 
-fn exec_command(args: &ArgMatches, config: &Config) -> Result<()> {
+fn exec_command(matches: &ArgMatches, config: &Config) -> Result<()> {
     let creds = try!(get_credentials(config));
 
-    let command_line: Vec<&str> = args.values_of("command").unwrap().collect();
+    let command_line: Vec<&str> = matches.values_of("command").unwrap().collect();
     
     let mut command_line_iter = command_line.into_iter();
     let command_name = command_line_iter.next().unwrap();
     let args: Vec<&str> = command_line_iter.collect();
 
+    let env = try!(get_vars(matches, config, &creds));
+
+    spawn_command(OsString::from(command_name).as_os_str(), &args[..], &env)
+}
+
+fn get_vars(_matches: &ArgMatches, config: &Config, creds: &rusoto::AwsCredentials) -> Result<HashMap<String, String>> {
     let mut env: HashMap<String, String> = HashMap::new();
 
     env.insert("AWS_ACCESS_KEY_ID".to_owned(), creds.aws_access_key_id().to_owned());
@@ -242,29 +206,6 @@ fn exec_command(args: &ArgMatches, config: &Config) -> Result<()> {
         env.insert("AWS_DEFAULT_REGION".to_owned(), region.to_string());
     }
 
-    spawn_command(OsString::from(command_name).as_os_str(), &args[..], &env)
+    Ok(env)
 }
 
-pub fn spawn_command<S>(command_str: &OsStr, args: &[S], env: &HashMap<String, String>) -> Result<()> where S: AsRef<OsStr> {
-        
-    let mut command = process::Command::new(command_str);
-    command.args(&args);
-
-    for (k,v) in env {
-        command.env(k, v);
-    }
-
-    {
-        let mut result = try!(command.spawn());
-        
-        let status = try!(result.wait());
-        
-        status.code().ok_or(StsCliError::ProcessKilled).and_then(|code| {
-            if code == 0 {
-                Ok(())
-            } else {
-                Err(StsCliError::ChildExited(code))
-            }
-        })
-    }
-}

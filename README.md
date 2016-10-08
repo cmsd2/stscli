@@ -4,9 +4,9 @@ A command line application for acquiring and using Amazon STS session tokens wit
 
 ## Usage
 
-Acquire some tokens and display them:
+Acquire some tokens and display them for pasting into a bash shell:
 ```
-stscli --profile foo get
+stscli --profile foo get --export --format bash
 ```
 
 Acquire some tokens and print the iam user using the aws cli:

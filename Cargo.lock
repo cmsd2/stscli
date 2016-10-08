@@ -7,6 +7,8 @@ dependencies = [
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "quick-error 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rusoto 0.18.0 (git+https://github.com/cmsd2/rusoto?rev=cf878b5ee26edb76d9c850f7b767026155c3020f)",
+ "regex 0.1.74 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rustc-serialize 0.3.19 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
