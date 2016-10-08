@@ -5,7 +5,10 @@ authors = ["Chris Dawes <cmsd2@cantab.net>"]
 license = "Apache-2.0"
 
 [dependencies]
-rusoto = { git = "https://github.com/cmsd2/rusoto", rev = "52c5c98ee4ec13ec9d307e3ab80d7187c90ad4f7", features = ["sts"] }
+#
+rusoto = { git = "https://github.com/cmsd2/rusoto", rev = "cf878b5ee26edb76d9c850f7b767026155c3020f", features = ["sts"] }
+#
+# rusoto = { path = "../rusoto", features = ["sts"] }
 clap = "2.11.0"
 quick-error = "1.1.0"
 log = "0.3.6"
