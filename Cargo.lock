@@ -6,8 +6,8 @@ dependencies = [
  "env_logger 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "quick-error 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "rusoto 0.18.0 (git+https://github.com/cmsd2/rusoto?rev=cf878b5ee26edb76d9c850f7b767026155c3020f)",
  "regex 0.1.74 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rusoto 0.18.0 (git+https://github.com/cmsd2/rusoto?rev=0803f72ff12a990b0a2c395b8519e1573e163daf)",
  "rustc-serialize 0.3.19 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -392,7 +392,7 @@ dependencies = [
 [[package]]
 name = "rusoto"
 version = "0.18.0"
-source = "git+https://github.com/cmsd2/rusoto?rev=cf878b5ee26edb76d9c850f7b767026155c3020f#cf878b5ee26edb76d9c850f7b767026155c3020f"
+source = "git+https://github.com/cmsd2/rusoto?rev=0803f72ff12a990b0a2c395b8519e1573e163daf#0803f72ff12a990b0a2c395b8519e1573e163daf"
 dependencies = [
  "chrono 0.2.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.9.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -401,7 +401,7 @@ dependencies = [
  "md5 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 0.1.74 (registry+https://github.com/rust-lang/crates.io-index)",
  "ring 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "rusoto_codegen 0.2.7 (git+https://github.com/cmsd2/rusoto?rev=cf878b5ee26edb76d9c850f7b767026155c3020f)",
+ "rusoto_codegen 0.2.7 (git+https://github.com/cmsd2/rusoto?rev=0803f72ff12a990b0a2c395b8519e1573e163daf)",
  "rust-ini 0.9.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-serialize 0.3.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc_version 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -415,7 +415,7 @@ dependencies = [
 [[package]]
 name = "rusoto_codegen"
 version = "0.2.7"
-source = "git+https://github.com/cmsd2/rusoto?rev=cf878b5ee26edb76d9c850f7b767026155c3020f#cf878b5ee26edb76d9c850f7b767026155c3020f"
+source = "git+https://github.com/cmsd2/rusoto?rev=0803f72ff12a990b0a2c395b8519e1573e163daf#0803f72ff12a990b0a2c395b8519e1573e163daf"
 dependencies = [
  "Inflector 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 0.1.16 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -791,8 +791,8 @@ dependencies = [
 "checksum regex 0.1.74 (registry+https://github.com/rust-lang/crates.io-index)" = "8e2c54e420856bac237d4e187ece0a9046172898f4008de1a36c06e5430f5bc6"
 "checksum regex-syntax 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)" = "279401017ae31cf4e15344aa3f085d0e2e5c1e70067289ef906906fdbe92c8fd"
 "checksum ring 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)" = "0d2f6547bf9640f1d3cc4e771f82374ec8fd237c17eeb3ff5cd5ccbe22377a09"
-"checksum rusoto 0.18.0 (git+https://github.com/cmsd2/rusoto?rev=cf878b5ee26edb76d9c850f7b767026155c3020f)" = "<none>"
-"checksum rusoto_codegen 0.2.7 (git+https://github.com/cmsd2/rusoto?rev=cf878b5ee26edb76d9c850f7b767026155c3020f)" = "<none>"
+"checksum rusoto 0.18.0 (git+https://github.com/cmsd2/rusoto?rev=0803f72ff12a990b0a2c395b8519e1573e163daf)" = "<none>"
+"checksum rusoto_codegen 0.2.7 (git+https://github.com/cmsd2/rusoto?rev=0803f72ff12a990b0a2c395b8519e1573e163daf)" = "<none>"
 "checksum rust-ini 0.9.8 (registry+https://github.com/rust-lang/crates.io-index)" = "263856150e5bff1dfa8e0827e5024977992089d082cd79026a0468d4a47cef92"
 "checksum rustc-serialize 0.3.19 (registry+https://github.com/rust-lang/crates.io-index)" = "6159e4e6e559c81bd706afe9c8fd68f547d3e851ce12e76b1de7914bab61691b"
 "checksum rustc_version 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "c5f5376ea5e30ce23c03eb77cbe4962b988deead10910c372b226388b594c084"

@@ -6,7 +6,7 @@ license = "Apache-2.0"
 
 [dependencies]
 #
-rusoto = { git = "https://github.com/cmsd2/rusoto", rev = "cf878b5ee26edb76d9c850f7b767026155c3020f", features = ["sts"] }
+rusoto = { git = "https://github.com/cmsd2/rusoto", rev = "0803f72ff12a990b0a2c395b8519e1573e163daf", features = ["sts"] }
 #
 # rusoto = { path = "../rusoto", features = ["sts"] }
 clap = "2.11.0"
