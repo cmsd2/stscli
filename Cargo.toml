@@ -1,17 +1,19 @@
 [package]
-name = "stscli"
-version = "0.1.0"
 authors = ["Chris Dawes <cmsd2@cantab.net>"]
 license = "Apache-2.0"
-
+name = "stscli"
+version = "0.1.0"
 [dependencies]
-#
-rusoto = { git = "https://github.com/cmsd2/rusoto", rev = "0803f72ff12a990b0a2c395b8519e1573e163daf", features = ["sts"] }
-#
-# rusoto = { path = "../rusoto", features = ["sts"] }
 clap = "2.11.0"
-quick-error = "1.1.0"
-log = "0.3.6"
 env_logger = "0.3.4"
-rustc-serialize = "0.3"
+log = "0.3.6"
+quick-error = "1.1.0"
 regex = "0.1.74"
+rust-ini = "0.10.0"
+rustc-serialize = "0.3"
+error-chain = "0.7.2"
+
+[dependencies.rusoto]
+features = ["sts"]
+git = "https://github.com/cmsd2/rusoto"
+rev = "01c2f3b565f5da17ef51c599afe25f725a7ab107"

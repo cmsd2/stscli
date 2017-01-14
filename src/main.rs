@@ -7,16 +7,19 @@ extern crate log;
 extern crate env_logger;
 extern crate rustc_serialize;
 extern crate regex;
+extern crate ini;
 
 pub mod print;
 pub mod result;
 pub mod config;
+pub mod aws_config;
 
 use clap::{Arg, ArgMatches, App, SubCommand};
 use std::io::Write;
 use std::collections::HashMap;
 use std::ffi::OsString;
 use rusoto::*;
+use rusoto::sts::*;
 use print::*;
 use result::*;
 use config::*;
@@ -124,10 +127,6 @@ fn run_subcommand(matches: &ArgMatches) -> Result<()> {
 fn get_credentials(config: &Config) -> Result<rusoto::AwsCredentials> {
     let mut profile_provider = try!(ProfileProvider::new());
 
-    if let Some(ref config_file_name) = config.config_file {
-        profile_provider.set_config_file_path(config_file_name);
-    }
-
     if let Some(ref credentials_file_name) = config.credentials_file {
         profile_provider.set_file_path(credentials_file_name);
     }
@@ -136,18 +135,48 @@ fn get_credentials(config: &Config) -> Result<rusoto::AwsCredentials> {
         profile_provider.set_profile(&profile[..]);
     }
 
-    let base_provider = ChainProvider::with_profile_provider(profile_provider);
+    if let Some(ref config_file_name) = config.config_file {
+        let aws_config = try!(aws_config::Config::load_from_path(config_file_name));
 
-    let mut provider = try!(StsProvider::new(base_provider));
+        if let Some(ref profile) = config.profile {
+            if let Some(ref profile_config) = aws_config.profiles.get(profile) {
+                let region = config.region
+                    .or_else(|| profile_config.region)
+                    .or_else(|| aws_config.default_region)
+                    .unwrap_or(Region::UsEast1);
 
-    provider.set_region(config.region);
-    provider.set_role_arn(config.role.clone());
-    provider.set_profile(config.profile.clone());
-    provider.set_session_name(config.name.clone());
+                let mut profile_provider = profile_provider.clone();
 
-    if config.config_file.is_some() {
-        provider.set_config_file_path(config.config_file.clone());
+                profile_provider.set_profile(profile_config.source_profile.clone().unwrap_or("default".to_owned()));
+
+                let base_provider = ChainProvider::with_profile_provider(profile_provider);
+
+                let sts_client = StsClient::new(base_provider, region);
+                
+                if let Some(ref role_arn) = profile_config.role_arn {
+                    let response = try!(sts_client.assume_role(&AssumeRoleRequest{
+                        role_arn: role_arn.to_owned(),
+                        role_session_name: config.name.clone().unwrap_or("stscli".to_owned()),
+                        ..Default::default()
+                    }));
+
+                    let sts_creds = try!(response.credentials.ok_or(StsCliError::Error("STS AssumeRole did not return any credentials".to_owned())));
+
+                    return Ok(try!(AwsCredentials::new_for_credentials(sts_creds)));
+                }
+
+                let response = try!(sts_client.get_session_token(&GetSessionTokenRequest {
+                    ..Default::default()
+                }));
+
+                let sts_creds = try!(response.credentials.ok_or(StsCliError::Error("STS GetSessionTokenRequest did not return any credentials".to_owned())));
+
+                return Ok(try!(AwsCredentials::new_for_credentials(sts_creds)));
+            }
+        }
     }
+
+    let provider = ChainProvider::with_profile_provider(profile_provider);
 
     provider.credentials().map_err(StsCliError::from)
 }

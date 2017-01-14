@@ -2,10 +2,16 @@ use rusoto;
 use std::io;
 use std::result;
 use rustc_serialize::json;
+use ini::ini;
 
 quick_error! {
     #[derive(Debug)]
     pub enum StsCliError {
+        Error(descr: String) {
+            description("error")
+            display("error: {}", descr)
+        }
+
         Io(err: io::Error) {
             from()
             description("io error")
@@ -41,6 +47,27 @@ quick_error! {
             from()
             description("json encoder error")
             display("Json encoder error: {}", err)
+            cause(err)
+        }
+
+        IniError(err: ini::Error) {
+            from()
+            description("ini error")
+            display("ini error: {}", err)
+            cause(err)
+        }
+
+        AssumeRoleError(err: rusoto::sts::AssumeRoleError) {
+            from()
+            description("STS AssumeRoleError")
+            display("STS AssumeRoleError: {}", err)
+            cause(err)
+        }
+
+        GetSessionTokenError(err: rusoto::sts::GetSessionTokenError) {
+            from()
+            description("STS GetSessionTokenError")
+            display("STS GetSessionTokenError: {}", err)
             cause(err)
         }
     }
