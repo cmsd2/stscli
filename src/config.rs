@@ -26,8 +26,8 @@ impl Config {
         let default_config_location = Some(try!(Config::default_config_location()));
 
         Ok(Config {
-            config_file: args.value_of("config_file").map(|s| PathBuf::from(s)).or_else(|| default_config_location),
-            credentials_file: args.value_of("credentials_file").map(|s| PathBuf::from(s)),
+            config_file: args.value_of("config").map(|s| PathBuf::from(s)).or_else(|| default_config_location),
+            credentials_file: args.value_of("credentials").map(|s| PathBuf::from(s)),
             profile: args.value_of("profile").map(|s| s.to_owned()),
             role: args.value_of("role").map(|s| s.to_owned()),
             region: region,

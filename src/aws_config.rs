@@ -67,6 +67,8 @@ fn get_profile_name_from_section_name(section_name: &str) -> Option<String> {
     let prefix = "profile ";
     if section_name.starts_with(prefix) {
         Some(section_name.chars().skip(prefix.len()).collect())
+    } else if section_name != "default" {
+        Some(section_name.to_owned())
     } else {
         None
     }

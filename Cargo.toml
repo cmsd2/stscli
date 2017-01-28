@@ -3,6 +3,7 @@ authors = ["Chris Dawes <cmsd2@cantab.net>"]
 license = "Apache-2.0"
 name = "stscli"
 version = "0.1.0"
+
 [dependencies]
 clap = "2.11.0"
 env_logger = "0.3.4"
@@ -16,4 +17,4 @@ error-chain = "0.7.2"
 [dependencies.rusoto]
 features = ["sts"]
 git = "https://github.com/cmsd2/rusoto"
-rev = "01c2f3b565f5da17ef51c599afe25f725a7ab107"
+rev = "d0b224c07e287263d79f6bfd7e5fc0cbe9c232eb"

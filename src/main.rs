@@ -18,6 +18,9 @@ use clap::{Arg, ArgMatches, App, SubCommand};
 use std::io::Write;
 use std::collections::HashMap;
 use std::ffi::OsString;
+use std::process;
+use std::path;
+use std::env;
 use rusoto::*;
 use rusoto::sts::*;
 use print::*;
@@ -29,7 +32,7 @@ pub fn main() {
     
     let mut stderr = std::io::stderr();
 
-    let matches = App::new("rusoto-sts")
+    let matches = App::new("stscli")
         .version("1.0")
         .author("Chris Dawes <cmsd2@cantab.net>")
         .about("Acquire session tokens from Amazon STS")
@@ -103,11 +106,17 @@ pub fn main() {
                 .help("shell command to run")
                 )
             )
+        .subcommand(SubCommand::with_name("list")
+            .about("lists the available profiles")
+            .version("1.0")
+            .author("various")
+            )
         .get_matches();
     
     match run_subcommand(&matches) {
         Err(err) => {
             writeln!(&mut stderr, "Error: {}", err).unwrap();
+            process::exit(1);
         },
         _ => {}
     }
@@ -120,6 +129,7 @@ fn run_subcommand(matches: &ArgMatches) -> Result<()> {
     match matches.subcommand() {
         ("get", Some(sub_matches)) => get_token(sub_matches, &config),
         ("exec", Some(sub_matches)) => exec_command(sub_matches, &config),
+        ("list", Some(sub_matches)) => list_profiles(sub_matches, &config),
         _ => Ok(())
     }
 }
@@ -151,7 +161,7 @@ fn get_credentials(config: &Config) -> Result<rusoto::AwsCredentials> {
 
                 let base_provider = ChainProvider::with_profile_provider(profile_provider);
 
-                let sts_client = StsClient::new(base_provider, region);
+                let sts_client = StsClient::new(try!(default_tls_client()), base_provider, region);
                 
                 if let Some(ref role_arn) = profile_config.role_arn {
                     let response = try!(sts_client.assume_role(&AssumeRoleRequest{
@@ -238,3 +248,39 @@ fn get_vars(_matches: &ArgMatches, config: &Config, creds: &rusoto::AwsCredentia
     Ok(env)
 }
 
+fn get_home_dir() -> Result<path::PathBuf> {
+    env::home_dir()
+        .ok_or_else(|| StsCliError::Error("can't find home directory".to_owned()))
+}
+
+fn get_default_config_path() -> Result<path::PathBuf> {
+    let mut path = path::PathBuf::new();
+    path.push(try!(get_home_dir()));
+    path.push(".aws/config");
+    Ok(path)
+}
+
+fn get_default_credentials_path() -> Result<path::PathBuf> {
+    let mut path = path::PathBuf::new();
+    path.push(try!(get_home_dir()));
+    path.push(".aws/credentials");
+    Ok(path)
+}
+
+fn list_profiles(_matches: &ArgMatches, config: &Config) -> Result<()> {
+    let default_credentials_path = try!(get_default_credentials_path());
+    let credentials_file = config.credentials_file.as_ref().unwrap_or(&default_credentials_path);
+    let credentials_profiles = try!(aws_config::Config::load_from_path(credentials_file));
+    for (p,_) in credentials_profiles.profiles {
+        println!("{}", p);
+    }
+
+    let default_config_path = try!(get_default_config_path());
+    let config_file = config.config_file.as_ref().unwrap_or(&default_config_path);
+    let config_profiles = try!(aws_config::Config::load_from_path(config_file));
+    for (p,_) in config_profiles.profiles {
+        println!("{}", p);
+    }
+
+    Ok(())
+}

@@ -70,6 +70,13 @@ quick_error! {
             display("STS GetSessionTokenError: {}", err)
             cause(err)
         }
+
+        TlsError(err: rusoto::TlsError) {
+            from()
+            description("TLS Error")
+            display("TLS Error: {}", err)
+            cause(err)
+        }
     }
 }
 
