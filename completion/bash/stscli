@@ -1,0 +1,18 @@
+_stscli_options()
+{
+    local cur;
+
+    prev=${COMP_WORDS[COMP_CWORD-1]}
+    cur=${COMP_WORDS[COMP_CWORD]}
+
+    case "$prev" in
+      --profile)
+        COMPREPLY=( $(compgen -W '$(stscli list 2>/dev/null)' $cur) )
+        ;;
+      *)
+        COMPREPLY=( $(compgen -W '--help --version --config --credentials --name --profile --region --role get exec list' -- $cur) )
+        ;;
+    esac
+}
+
+complete -F _stscli_options stscli
