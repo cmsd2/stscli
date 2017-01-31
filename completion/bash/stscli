@@ -6,11 +6,11 @@ _stscli_options()
     cur=${COMP_WORDS[COMP_CWORD]}
 
     case "$prev" in
-      --profile)
+      --profile | -p)
         COMPREPLY=( $(compgen -W '$(stscli list 2>/dev/null)' $cur) )
         ;;
       *)
-        COMPREPLY=( $(compgen -W '--help --version --config --credentials --name --profile --region --role get exec list' -- $cur) )
+        COMPREPLY=( $(compgen -W '--help --version --config --credentials --name --profile --region --role --serial_number --token_code get exec list' -- $cur) )
         ;;
     esac
 }
