@@ -3,6 +3,10 @@ authors = ["Chris Dawes <cmsd2@cantab.net>"]
 license = "Apache-2.0"
 name = "stscli"
 version = "0.1.0"
+categories = ["authentication", "command-line-interface"]
+description = "CLI to get temporary session tokens from Amazon's AWS STS Api."
+repository = "https://github.com/cmsd2/stscli"
+keywords = ["AWS", "STS", "cli", "token", "role"]
 
 [dependencies]
 clap = "2.11.0"
