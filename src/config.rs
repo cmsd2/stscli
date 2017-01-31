@@ -13,6 +13,8 @@ pub struct Config {
     pub role: Option<String>,
     pub region: Option<rusoto::Region>,
     pub name: Option<String>,
+    pub serial_number: Option<String>,
+    pub token_code: Option<String>,
 }
 
 impl Config {
@@ -32,6 +34,8 @@ impl Config {
             role: args.value_of("role").map(|s| s.to_owned()),
             region: region,
             name: args.value_of("name").map(|s| s.to_owned()),
+            serial_number: args.value_of("serial_number").map(|s| s.to_owned()),
+            token_code: args.value_of("token_code").map(|s| s.to_owned()),
         })
     }
 

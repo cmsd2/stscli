@@ -74,6 +74,18 @@ pub fn main() {
             .help("The name of the session to use if assuming a role. It will appear in CloudTrail logs. [\\w+=,.@-]*")
             .takes_value(true)
             )
+        .arg(Arg::with_name("serial_number")
+            .short("s")
+            .long("serial-number")
+            .help("The serial number or ARN of the MFA device.")
+            .takes_value(true)
+            )
+        .arg(Arg::with_name("token_code")
+            .short("t")
+            .long("token-code")
+            .help("The code from the MFA device.")
+            .takes_value(true)
+            )
         .subcommand(SubCommand::with_name("get")
             .about("get some fresh session tokens and display them")
             .version("1.0")
@@ -167,6 +179,8 @@ fn get_credentials(config: &Config) -> Result<rusoto::AwsCredentials> {
                     let response = try!(sts_client.assume_role(&AssumeRoleRequest{
                         role_arn: role_arn.to_owned(),
                         role_session_name: config.name.clone().unwrap_or("stscli".to_owned()),
+                        serial_number: config.serial_number.clone(),
+                        token_code: config.token_code.clone(),
                         ..Default::default()
                     }));
 
