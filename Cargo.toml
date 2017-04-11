@@ -20,5 +20,5 @@ error-chain = "0.7.2"
 
 [dependencies.rusoto]
 features = ["sts"]
-git = "https://github.com/cmsd2/rusoto"
-rev = "d0b224c07e287263d79f6bfd7e5fc0cbe9c232eb"
+git = "https://github.com/rusoto/rusoto"
+rev = "ed1c3ff0e111b0eaaace3d4d4b7d5404cc57ea6e"

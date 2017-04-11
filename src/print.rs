@@ -49,7 +49,7 @@ pub fn print_var(k: &str, v: &str, output_format: OutputFormat) {
 pub fn spawn_command<S>(command_str: &OsStr, args: &[S], env: &HashMap<String, String>) -> Result<()> where S: AsRef<OsStr> {
         
     let mut command = process::Command::new(command_str);
-    command.args(&args);
+    command.args(args);
 
     for (k,v) in env {
         command.env(k, v);
