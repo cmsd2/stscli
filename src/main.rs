@@ -5,9 +5,12 @@ extern crate quick_error;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
-extern crate rustc_serialize;
 extern crate regex;
 extern crate ini;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde;
+extern crate serde_json;
 
 pub mod print;
 pub mod result;

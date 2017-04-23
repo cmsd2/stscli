@@ -10,7 +10,9 @@ dependencies = [
  "regex 0.1.80 (registry+https://github.com/rust-lang/crates.io-index)",
  "rusoto 0.24.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust-ini 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "rustc-serialize 0.3.23 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 0.9.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 0.9.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 0.9.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

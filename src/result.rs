@@ -1,7 +1,7 @@
 use rusoto;
 use std::io;
 use std::result;
-use rustc_serialize::json;
+use serde_json;
 use ini::ini;
 
 quick_error! {
@@ -43,7 +43,7 @@ quick_error! {
             display("child exited: {}", code)
         }
 
-        JsonEncoderError(err: json::EncoderError) {
+        JsonEncoderError(err: serde_json::Error) {
             from()
             description("json encoder error")
             display("Json encoder error: {}", err)

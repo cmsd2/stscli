@@ -2,7 +2,7 @@ use regex::Regex;
 use std::process;
 use clap::ArgMatches;
 use std::collections::HashMap;
-use rustc_serialize::json;
+use serde_json;
 use std::ffi::OsStr;
 use result::*;
 use config::*;
@@ -16,7 +16,7 @@ pub enum OutputFormat {
 }
 
 pub fn print_vars_json(_args: &ArgMatches, _config: &Config, vars: &HashMap<String, String>) -> Result<()> {
-    let vars_json = try!(json::encode(vars).map_err(StsCliError::from));
+    let vars_json = try!(serde_json::to_string(&vars).map_err(StsCliError::from));
 
     println!("{}", vars_json);
 
