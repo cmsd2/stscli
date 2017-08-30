@@ -1,4 +1,5 @@
-use rusoto;
+use rusoto_core;
+use rusoto_sts;
 use std::io;
 use std::result;
 use serde_json;
@@ -19,14 +20,14 @@ quick_error! {
             cause(err)
         }
 
-        Credentials(err: rusoto::CredentialsError) {
+        Credentials(err: rusoto_core::CredentialsError) {
             from()
             description("aws credentials error")
             display("AWS Credentials error: {}", err)
             cause(err)
         }
 
-        Region(err: rusoto::ParseRegionError) {
+        Region(err: rusoto_core::ParseRegionError) {
             from()
             description("aws region error")
             display("AWS Region parser error: {}", err)
@@ -57,21 +58,21 @@ quick_error! {
             cause(err)
         }
 
-        AssumeRoleError(err: rusoto::sts::AssumeRoleError) {
+        AssumeRoleError(err: rusoto_sts::AssumeRoleError) {
             from()
             description("STS AssumeRoleError")
             display("STS AssumeRoleError: {}", err)
             cause(err)
         }
 
-        GetSessionTokenError(err: rusoto::sts::GetSessionTokenError) {
+        GetSessionTokenError(err: rusoto_sts::GetSessionTokenError) {
             from()
             description("STS GetSessionTokenError")
             display("STS GetSessionTokenError: {}", err)
             cause(err)
         }
 
-        TlsError(err: rusoto::TlsError) {
+        TlsError(err: rusoto_core::TlsError) {
             from()
             description("TLS Error")
             display("TLS Error: {}", err)

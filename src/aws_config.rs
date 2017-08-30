@@ -6,7 +6,7 @@ use std::fs::File;
 use std::collections::HashMap;
 use std::result;
 use std::str::FromStr;
-use rusoto::Region;
+use rusoto_core::Region;
 
 pub trait LoadFromPath where Self: Sized {
     type Error: Sized + 'static;

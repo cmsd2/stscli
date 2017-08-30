@@ -2,7 +2,7 @@
 authors = ["Chris Dawes <cmsd2@cantab.net>"]
 license = "Apache-2.0"
 name = "stscli"
-version = "0.2.0"
+version = "0.3.0"
 categories = ["authentication", "command-line-interface"]
 description = "CLI to get temporary session tokens from Amazon's AWS STS Api."
 repository = "https://github.com/cmsd2/stscli"
@@ -19,7 +19,5 @@ error-chain = "0.7.2"
 serde = "0.9.13"
 serde_derive = "0.9.13"
 serde_json = "0.9.10"
-
-[dependencies.rusoto]
-features = ["sts"]
-version = "0.24.0"
+rusoto_core = "0.28.0"
+rusoto_sts = "0.28.0"

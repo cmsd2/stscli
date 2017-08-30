@@ -1,4 +1,4 @@
-use rusoto;
+use rusoto_core;
 use clap::ArgMatches;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -11,7 +11,7 @@ pub struct Config {
     pub credentials_file: Option<PathBuf>,
     pub profile: Option<String>,
     pub role: Option<String>,
-    pub region: Option<rusoto::Region>,
+    pub region: Option<rusoto_core::Region>,
     pub name: Option<String>,
     pub serial_number: Option<String>,
     pub token_code: Option<String>,
@@ -20,7 +20,7 @@ pub struct Config {
 impl Config {
     pub fn new_for_matches(args: &ArgMatches) -> Result<Config> {
         let region = if let Some(region_name) = args.value_of("region") {
-            Some(try!(rusoto::Region::from_str(region_name)))
+            Some(try!(rusoto_core::Region::from_str(region_name)))
         } else {
             None
         };

@@ -1,5 +1,6 @@
 extern crate clap;
-extern crate rusoto;
+extern crate rusoto_core;
+extern crate rusoto_sts;
 #[macro_use]
 extern crate quick_error;
 #[macro_use]
@@ -7,8 +8,6 @@ extern crate log;
 extern crate env_logger;
 extern crate regex;
 extern crate ini;
-#[macro_use]
-extern crate serde_derive;
 extern crate serde;
 extern crate serde_json;
 
@@ -24,8 +23,8 @@ use std::ffi::OsString;
 use std::process;
 use std::path;
 use std::env;
-use rusoto::*;
-use rusoto::sts::*;
+use rusoto_core::*;
+use rusoto_sts::*;
 use print::*;
 use result::*;
 use config::*;
@@ -149,7 +148,7 @@ fn run_subcommand(matches: &ArgMatches) -> Result<()> {
     }
 }
 
-fn get_credentials(config: &Config) -> Result<rusoto::AwsCredentials> {
+fn get_credentials(config: &Config) -> Result<rusoto_core::AwsCredentials> {
     let mut profile_provider = try!(ProfileProvider::new());
 
     if let Some(ref credentials_file_name) = config.credentials_file {
@@ -160,52 +159,62 @@ fn get_credentials(config: &Config) -> Result<rusoto::AwsCredentials> {
         profile_provider.set_profile(&profile[..]);
     }
 
+    let mut profile_provider = profile_provider.clone();
+    let mut region = Region::UsEast1;
+    let mut role_arn = None;
+
     if let Some(ref config_file_name) = config.config_file {
         let aws_config = try!(aws_config::Config::load_from_path(config_file_name));
 
+        if let Some(ref default_region) = aws_config.default_region {
+            region = default_region.clone();
+        }
+
         if let Some(ref profile) = config.profile {
             if let Some(ref profile_config) = aws_config.profiles.get(profile) {
-                let region = config.region
-                    .or_else(|| profile_config.region)
-                    .or_else(|| aws_config.default_region)
-                    .unwrap_or(Region::UsEast1);
-
-                let mut profile_provider = profile_provider.clone();
-
-                profile_provider.set_profile(profile_config.source_profile.clone().unwrap_or("default".to_owned()));
-
-                let base_provider = ChainProvider::with_profile_provider(profile_provider);
-
-                let sts_client = StsClient::new(try!(default_tls_client()), base_provider, region);
-                
-                if let Some(ref role_arn) = profile_config.role_arn {
-                    let response = try!(sts_client.assume_role(&AssumeRoleRequest{
-                        role_arn: role_arn.to_owned(),
-                        role_session_name: config.name.clone().unwrap_or("stscli".to_owned()),
-                        serial_number: config.serial_number.clone(),
-                        token_code: config.token_code.clone(),
-                        ..Default::default()
-                    }));
-
-                    let sts_creds = try!(response.credentials.ok_or(StsCliError::Error("STS AssumeRole did not return any credentials".to_owned())));
-
-                    return Ok(try!(AwsCredentials::new_for_credentials(sts_creds)));
+                if let Some(ref profile_region) = profile_config.region {
+                    region = profile_region.clone();
                 }
 
-                let response = try!(sts_client.get_session_token(&GetSessionTokenRequest {
-                    ..Default::default()
-                }));
+                role_arn = profile_config.role_arn.clone();
 
-                let sts_creds = try!(response.credentials.ok_or(StsCliError::Error("STS GetSessionTokenRequest did not return any credentials".to_owned())));
-
-                return Ok(try!(AwsCredentials::new_for_credentials(sts_creds)));
+                profile_provider.set_profile(profile_config.source_profile.clone().unwrap_or("default".to_owned()));
             }
         }
     }
 
-    let provider = ChainProvider::with_profile_provider(profile_provider);
+    if config.role.is_some() {
+        role_arn = config.role.clone();
+    }
 
-    provider.credentials().map_err(StsCliError::from)
+    if let Some(ref config_region) = config.region {
+        region = config_region.clone();
+    }
+
+    let base_provider = ChainProvider::with_profile_provider(profile_provider);
+
+    let sts_client = StsClient::new(try!(default_tls_client()), base_provider, region);
+
+    if let Some(role_arn) = role_arn {
+        let response = try!(sts_client.assume_role(&AssumeRoleRequest{
+            role_arn: role_arn.to_owned(),
+            role_session_name: config.name.clone().unwrap_or("stscli".to_owned()),
+            serial_number: config.serial_number.clone(),
+            token_code: config.token_code.clone(),
+            ..Default::default()
+        }));
+
+        let sts_creds = try!(response.credentials.ok_or(StsCliError::Error("STS AssumeRole did not return any credentials".to_owned())));
+        return Ok(try!(AwsCredentials::new_for_credentials(sts_creds)));
+    }
+
+    let response = try!(sts_client.get_session_token(&GetSessionTokenRequest {
+        ..Default::default()
+    }));
+
+    let sts_creds = try!(response.credentials.ok_or(StsCliError::Error("STS GetSessionTokenRequest did not return any credentials".to_owned())));
+
+    return Ok(try!(AwsCredentials::new_for_credentials(sts_creds)));
 }
 
 fn get_output_format(args: &ArgMatches) -> OutputFormat {
@@ -247,18 +256,17 @@ fn exec_command(matches: &ArgMatches, config: &Config) -> Result<()> {
     spawn_command(OsString::from(command_name).as_os_str(), &args[..], &env)
 }
 
-fn get_vars(_matches: &ArgMatches, config: &Config, creds: &rusoto::AwsCredentials) -> Result<HashMap<String, String>> {
+fn get_vars(_matches: &ArgMatches, config: &Config, creds: &rusoto_core::AwsCredentials) -> Result<HashMap<String, String>> {
     let mut env: HashMap<String, String> = HashMap::new();
 
     env.insert("AWS_ACCESS_KEY_ID".to_owned(), creds.aws_access_key_id().to_owned());
     env.insert("AWS_SECRET_ACCESS_KEY".to_owned(), creds.aws_secret_access_key().to_owned());
-
     if let Some(ref session_token) = *creds.token() {
         env.insert("AWS_SESSION_TOKEN".to_owned(), session_token.to_owned());
         env.insert("AWS_SECURITY_TOKEN".to_owned(), session_token.to_owned());
     }
 
-    if let Some(region) = config.region {
+    if let Some(ref region) = config.region {
         env.insert("AWS_DEFAULT_REGION".to_owned(), region.to_string());
     }
 
