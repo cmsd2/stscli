@@ -2,10 +2,26 @@
 
 A command line application for acquiring and using Amazon STS session tokens with IAM roles.
 
+## Retired
+
+This repository is archived and no longer maintained. The AWS CLI v2 now does
+what stscli was written for, including for SSO profiles:
+
+| stscli | instead |
+|---|---|
+| `stscli -p prof get --export` | `aws configure export-credentials --profile prof --format env` |
+| `stscli -p prof exec cmd` | `AWS_PROFILE=prof cmd`, or `aws-vault exec prof -- cmd` |
+| a role with MFA | a profile with `role_arn`, `source_profile` and `mfa_serial`; the CLI asks for the code and caches the session |
+| `stscli list` | `aws configure list-profiles` |
+
+The versions on crates.io (0.1.0 to 0.3.0) predate the move off `rusoto` and
+carry known advisories in their dependencies. The code on `master` is the
+updated 0.4.0, which was never published; build it from source if you need it.
+
 ## Install
 
 ```
-cargo install stscli
+cargo install --git https://github.com/cmsd2/stscli
 ```
 
 ## Usage
