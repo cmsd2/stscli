@@ -1,116 +1,120 @@
-use regex::Regex;
-use std::process;
-use clap::ArgMatches;
-use std::collections::HashMap;
-use serde_json;
-use std::ffi::OsStr;
-use result::*;
-use config::*;
+//! Turns session credentials into environment variables and the shell
+//! syntax that sets them.
 
-#[derive(Copy, Clone, Debug)]
-pub enum OutputFormat {
-    Bash { export: bool },
-    Fish { export: bool },
-    Powershell { export: bool },
-    Json
+use std::collections::BTreeMap;
+
+use clap::ValueEnum;
+
+use crate::result::Result;
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
+pub enum Format {
+    Bash,
+    Fish,
+    Powershell,
+    Json,
 }
 
-pub fn print_vars_json(_args: &ArgMatches, _config: &Config, vars: &HashMap<String, String>) -> Result<()> {
-    let vars_json = try!(serde_json::to_string(&vars).map_err(StsCliError::from));
-
-    println!("{}", vars_json);
-
-    Ok(())
-}
-
-pub fn print_vars(_args: &ArgMatches, _config: &Config, vars: &HashMap<String, String>, output_format: OutputFormat) -> Result<()> {
+/// Every line `get` prints, in a stable order.
+pub fn render(vars: &BTreeMap<String, String>, format: Format, export: bool) -> Result<String> {
+    if format == Format::Json {
+        return Ok(format!("{}\n", serde_json::to_string(vars)?));
+    }
+    let mut out = String::new();
     for (k, v) in vars {
-        print_var(k, v, output_format);
+        out.push_str(&render_var(k, v, format, export));
+        out.push('\n');
     }
-
-    Ok(())
+    Ok(out)
 }
 
-pub fn print_var(k: &str, v: &str, output_format: OutputFormat) {
-    match output_format {
-        OutputFormat::Bash{export} => {
-            print_bash_var(k, v, export);
-        },
-        OutputFormat::Fish{export} => {
-            print_var_fish(k, v, export);
-        },
-        OutputFormat::Powershell{export} => {
-            print_var_ps(k, v, export);
-        },
-        _ => unreachable!()
-    };
-}
-
-pub fn spawn_command<S>(command_str: &OsStr, args: &[S], env: &HashMap<String, String>) -> Result<()> where S: AsRef<OsStr> {
-        
-    let mut command = process::Command::new(command_str);
-    command.args(args);
-
-    for (k,v) in env {
-        command.env(k, v);
-    }
-
-    {
-        let mut result = try!(command.spawn());
-        
-        let status = try!(result.wait());
-        
-        status.code().ok_or(StsCliError::ProcessKilled).and_then(|code| {
-            if code == 0 {
-                Ok(())
-            } else {
-                Err(StsCliError::ChildExited(code))
-            }
-        })
+fn render_var(k: &str, v: &str, format: Format, export: bool) -> String {
+    match format {
+        Format::Bash => {
+            let prefix = if export { "export " } else { "" };
+            format!(
+                "{prefix}{k}=\"{}\"",
+                escape(v, &['\\', '"', '$', '`'], '\\')
+            )
+        }
+        Format::Fish => {
+            let prefix = if export { "set -x" } else { "set" };
+            format!("{prefix} {k} \"{}\"", escape(v, &['\\', '"', '$'], '\\'))
+        }
+        Format::Powershell => {
+            let prefix = if export { "env:" } else { "" };
+            format!("${prefix}{k} = \"{}\"", escape(v, &['`', '"', '$'], '`'))
+        }
+        Format::Json => unreachable!("JSON is rendered as one object"),
     }
 }
 
-fn print_bash_var(k: &str, v: &str, export_vars: bool) {
-    let re = shell_re();
-
-    let export_prefix = if export_vars { "export " } else { "" };
-
-    let escaped = re.replace_all(v, shell_esc());
-    println!("{}{}=\"{}\"", export_prefix, k, escaped);
+/// Prefixes each character in `special` with `escape`, so the value reads
+/// back literally inside a double-quoted string in that shell.
+fn escape(v: &str, special: &[char], escape: char) -> String {
+    let mut out = String::with_capacity(v.len());
+    for c in v.chars() {
+        if special.contains(&c) {
+            out.push(escape);
+        }
+        out.push(c);
+    }
+    out
 }
 
-fn print_var_fish(k: &str, v: &str, export_vars: bool) {
-    let re = shell_re();
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    let export_prefix = if export_vars { "set -x" } else { "set" };
+    fn vars() -> BTreeMap<String, String> {
+        BTreeMap::from([
+            ("B".to_owned(), "two".to_owned()),
+            ("A".to_owned(), r#"a"b\c$d`e"#.to_owned()),
+        ])
+    }
 
-    let escaped = re.replace_all(v, shell_esc());
-    println!("{} {} \"{}\"", export_prefix, k, escaped);
-}
+    #[test]
+    fn bash_escapes_and_sorts() {
+        assert_eq!(
+            render(&vars(), Format::Bash, true).unwrap(),
+            "export A=\"a\\\"b\\\\c\\$d\\`e\"\nexport B=\"two\"\n"
+        );
+        assert_eq!(
+            render(&vars(), Format::Bash, false).unwrap().lines().last(),
+            Some("B=\"two\"")
+        );
+    }
 
-fn print_var_ps(k: &str, v: &str, export_vars: bool) {
-    let re = powershell_re();
+    #[test]
+    fn fish() {
+        assert_eq!(
+            render(&vars(), Format::Fish, true).unwrap(),
+            "set -x A \"a\\\"b\\\\c\\$d`e\"\nset -x B \"two\"\n"
+        );
+        assert!(
+            render(&vars(), Format::Fish, false)
+                .unwrap()
+                .starts_with("set A ")
+        );
+    }
 
-    let export_prefix = if export_vars { "env:" } else { "" };
+    #[test]
+    fn powershell() {
+        assert_eq!(
+            render(&vars(), Format::Powershell, true).unwrap(),
+            "$env:A = \"a`\"b\\c`$d``e\"\n$env:B = \"two\"\n"
+        );
+        assert!(
+            render(&vars(), Format::Powershell, false)
+                .unwrap()
+                .starts_with("$A = ")
+        );
+    }
 
-    let escaped = re.replace_all(v, powershell_esc());
-    println!("${}{} = \"{}\"", export_prefix, k, escaped);
-}
-
-fn shell_re() -> Regex {
-    let pattern = r#"[\\"]"#;
-    Regex::new(pattern).unwrap()
-}
-
-fn shell_esc() -> &'static str {
-    "\\$0"
-}
-
-fn powershell_re() -> Regex {
-    let pattern = r#"[\0\r\n\t`"]"#;
-    Regex::new(pattern).unwrap()
-}
-
-fn powershell_esc() -> &'static str {
-    "`$0"
+    #[test]
+    fn json_is_one_object() {
+        let out = render(&vars(), Format::Json, false).unwrap();
+        let back: BTreeMap<String, String> = serde_json::from_str(&out).unwrap();
+        assert_eq!(back, vars());
+    }
 }
