@@ -10,7 +10,7 @@ _stscli_options()
         COMPREPLY=( $(compgen -W '$(stscli list 2>/dev/null)' $cur) )
         ;;
       *)
-        COMPREPLY=( $(compgen -W '--help --version --config --credentials --name --profile --region --role --serial_number --token_code get exec list' -- $cur) )
+        COMPREPLY=( $(compgen -W '--help --version --config --credentials --name --profile --region --role --serial-number --token-code get exec list' -- $cur) )
         ;;
     esac
 }
